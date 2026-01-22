@@ -1,6 +1,26 @@
+# Dependencies
 node_modules/
-package-lock.json
-.env
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS files
 .DS_Store
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+
+# Build
+dist/
+build/
+
+# Temp
+*.tmp
+*.temp

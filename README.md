@@ -1,43 +1,55 @@
-# 🎬 Video Stream Detector
+# 🎬 Video Stream Detector API
 
-Auto-detect m3u8/HLS video stream URLs from embed pages using Playwright headless browser.
+A Node.js API that uses Playwright headless browser to automatically detect m3u8/HLS stream URLs from video embed pages.
 
 ## Features
 
-- 🔍 **Auto-detection** - Automatically finds m3u8 URLs from any embed page
-- 🚀 **Headless browser** - Uses Playwright Chromium to intercept network requests
-- 🔌 **REST API** - Simple API endpoints for integration
-- 🎮 **Web UI** - Built-in player with full controls
-- 🌐 **CORS Proxy** - Proxies HLS streams to bypass CORS restrictions
+- 🔍 **Auto-detect m3u8 URLs** - Uses headless Chromium to load embed pages and intercept network requests
+- 🔄 **HLS Proxy** - Proxy endpoint to bypass CORS restrictions when playing streams
+- 🌐 **Web UI** - Built-in web interface to test detection and play videos
+- 🚀 **Simple API** - RESTful JSON API for easy integration
 
 ## Quick Start
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm
+
+### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/YOUR_USERNAME/video-stream-detector.git
 cd video-stream-detector
 
-# Install dependencies and browser
+# Install dependencies and Playwright browser
 npm run setup
+```
 
-# Start the server
+### Run the Server
+
+```bash
 npm start
 ```
 
-Open http://localhost:3333 in your browser.
+Server will start at `http://localhost:3333`
 
 ## API Endpoints
 
-### Detect m3u8 URL
+### `GET /api/detect?url=<embed_url>`
 
-```
-GET /api/detect?url=<embed_url>
-```
+Detect m3u8 URLs from an embed page.
 
 **Parameters:**
 - `url` (required) - The embed page URL to scan
 - `timeout` (optional) - Page load timeout in ms (default: 15000)
 - `wait` (optional) - Time to wait for network requests in ms (default: 5000)
+
+**Example:**
+```bash
+curl "http://localhost:3333/api/detect?url=https://example.com/embed/video123"
+```
 
 **Response:**
 ```json
@@ -45,81 +57,95 @@ GET /api/detect?url=<embed_url>
   "success": true,
   "count": 2,
   "urls": [
-    { "url": "https://example.com/master.m3u8?token=...", "type": "request", "time": 1234 }
+    { "url": "https://cdn.example.com/master.m3u8?token=xxx", "type": "request", "time": 1234 },
+    { "url": "https://cdn.example.com/index.m3u8", "type": "response", "time": 1456 }
   ],
-  "master": { "url": "https://example.com/master.m3u8?token=...", "type": "request", "time": 1234 },
+  "master": { "url": "https://cdn.example.com/master.m3u8?token=xxx", "type": "request", "time": 1234 },
   "elapsed": 5432
 }
 ```
 
-### Proxy HLS Stream
+### `GET /api/proxy?url=<stream_url>`
 
-```
-GET /api/proxy?url=<stream_url>
-```
+Proxy HLS streams to bypass CORS restrictions.
 
-Proxies the HLS stream to bypass CORS restrictions.
-
-### Health Check
-
-```
-GET /api/health
+**Example:**
+```bash
+curl "http://localhost:3333/api/proxy?url=https://cdn.example.com/master.m3u8"
 ```
 
-Returns server status and Playwright availability.
+### `GET /api/health`
 
-## Ubuntu/Linux Installation
+Health check endpoint.
 
-### Prerequisites
+**Response:**
+```json
+{
+  "status": "ok",
+  "playwright": true,
+  "uptime": 123.456
+}
+```
+
+### `GET /`
+
+Web UI for testing detection and playing videos.
+
+## Ubuntu Server Deployment
+
+### Option 1: Quick Install Script
+
+```bash
+# Download and run install script
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/video-stream-detector/main/install.sh | bash
+```
+
+### Option 2: Manual Installation
 
 ```bash
 # Update system
 sudo apt update && sudo apt upgrade -y
 
-# Install Node.js 18+
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
-# Install dependencies for Playwright
-sudo apt install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
-  libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 \
-  libasound2 libpango-1.0-0 libcairo2
-```
+# Install Playwright dependencies
+sudo npx playwright install-deps chromium
 
-### Installation
-
-```bash
-# Clone repository
+# Clone and setup
 git clone https://github.com/YOUR_USERNAME/video-stream-detector.git
 cd video-stream-detector
-
-# Install dependencies
 npm run setup
 
-# Start server
-npm start
+# Run with PM2 (recommended for production)
+sudo npm install -g pm2
+pm2 start server.js --name video-detector
+pm2 save
+pm2 startup
 ```
 
-### Run as a Service (systemd)
+### Running as a Service (systemd)
 
 ```bash
 # Create service file
 sudo nano /etc/systemd/system/video-detector.service
 ```
 
-Paste:
+Add this content:
 ```ini
 [Unit]
-Description=Video Stream Detector
+Description=Video Stream Detector API
 After=network.target
 
 [Service]
 Type=simple
-User=YOUR_USERNAME
+User=www-data
 WorkingDirectory=/path/to/video-stream-detector
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 Environment=PORT=3333
+Environment=HOST=0.0.0.0
 
 [Install]
 WantedBy=multi-user.target
@@ -130,70 +156,35 @@ Then:
 sudo systemctl daemon-reload
 sudo systemctl enable video-detector
 sudo systemctl start video-detector
-sudo systemctl status video-detector
 ```
 
-### Nginx Reverse Proxy (Optional)
+## Configuration
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
+Environment variables:
+- `PORT` - Server port (default: 3333)
+- `HOST` - Server host (default: 0.0.0.0)
 
-    location / {
-        proxy_pass http://127.0.0.1:3333;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
+## Docker (Optional)
+
+```dockerfile
+FROM node:20-slim
+
+RUN npx playwright install-deps chromium
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+RUN npx playwright install chromium
+
+COPY . .
+
+EXPOSE 3333
+CMD ["node", "server.js"]
 ```
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | 3333 | Server port |
-| `HOST` | 0.0.0.0 | Server host |
-
-## Usage Examples
-
-### cURL
 
 ```bash
-# Detect m3u8 URL
-curl "http://localhost:3333/api/detect?url=https://example.com/embed/video123"
-
-# With custom timeout
-curl "http://localhost:3333/api/detect?url=https://example.com/embed/video123&timeout=20000&wait=8000"
-```
-
-### JavaScript
-
-```javascript
-const response = await fetch('http://localhost:3333/api/detect?url=' + encodeURIComponent(embedUrl));
-const data = await response.json();
-
-if (data.success) {
-  console.log('Found:', data.master.url);
-}
-```
-
-### Python
-
-```python
-import requests
-
-response = requests.get('http://localhost:3333/api/detect', params={
-    'url': 'https://example.com/embed/video123'
-})
-data = response.json()
-
-if data['success']:
-    print('Found:', data['master']['url'])
+docker build -t video-detector .
+docker run -p 3333:3333 video-detector
 ```
 
 ## License
