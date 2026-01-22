@@ -20,7 +20,7 @@ A Node.js API that uses Playwright headless browser to automatically detect m3u8
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/video-stream-detector.git
+git clone https://github.com/healertrix/video-stream-detector.git
 cd video-stream-detector
 
 # Install dependencies and Playwright browser
@@ -97,7 +97,7 @@ Web UI for testing detection and playing videos.
 
 ```bash
 # Download and run install script
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/video-stream-detector/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/healertrix/video-stream-detector/main/install.sh | bash
 ```
 
 ### Option 2: Manual Installation
@@ -114,7 +114,7 @@ sudo apt install -y nodejs
 sudo npx playwright install-deps chromium
 
 # Clone and setup
-git clone https://github.com/YOUR_USERNAME/video-stream-detector.git
+git clone https://github.com/healertrix/video-stream-detector.git
 cd video-stream-detector
 npm run setup
 

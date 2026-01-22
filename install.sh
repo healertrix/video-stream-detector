@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Video Stream Detector - Ubuntu Installation Script
-# Usage: curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/video-stream-detector/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/healertrix/video-stream-detector/main/install.sh | bash
 
 set -e
 
@@ -47,7 +47,7 @@ sudo npx playwright install-deps chromium
 INSTALL_DIR="$HOME/video-stream-detector"
 if [ ! -d "$INSTALL_DIR" ]; then
     echo -e "${GREEN}[5/6] Cloning repository...${NC}"
-    git clone https://github.com/YOUR_USERNAME/video-stream-detector.git "$INSTALL_DIR"
+    git clone https://github.com/healertrix/video-stream-detector.git "$INSTALL_DIR"
 else
     echo -e "${GREEN}[5/6] Directory exists, pulling latest...${NC}"
     cd "$INSTALL_DIR" && git pull
