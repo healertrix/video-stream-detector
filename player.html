@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Stream Detector</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        :root { --bg:#0a0a12;--card:#14141f;--border:#252535;--accent:#00d4ff;--accent2:#a855f7;--text:#f0f0f5;--dim:#7a7a8c;--success:#22c55e;--warning:#f59e0b;--error:#ef4444; }
+        * { margin:0;padding:0;box-sizing:border-box; }
+        body { font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh; }
+        .container { max-width:1000px;margin:0 auto;padding:20px; }
+        h1 { text-align:center;font-size:1.8rem;margin-bottom:20px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent; }
+        .panel { background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:20px; }
+        .panel-head { padding:15px 20px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);font-weight:600;display:flex;align-items:center;gap:10px; }
+        .panel-head svg { width:20px;height:20px;fill:var(--accent); }
+        .detect-section { padding:20px; }
+        .detect-row { display:flex;gap:10px;margin-bottom:15px; }
+        .detect-input { flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 16px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.85rem;outline:none; }
+        .detect-input:focus { border-color:var(--accent); }
+        .detect-input::placeholder { color:var(--dim); }
+        .detect-btn { background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;border:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s; }
+        .detect-btn:hover { transform:translateY(-2px);box-shadow:0 5px 20px rgba(0,212,255,0.3); }
+        .detect-btn:disabled { opacity:0.6;cursor:not-allowed;transform:none; }
+        .detect-btn svg { width:18px;height:18px;fill:currentColor; }
+        .status-box { background:var(--bg);border-radius:10px;padding:15px;font-family:'JetBrains Mono',monospace;font-size:0.8rem; }
+        .status-box.loading { border-left:3px solid var(--accent);color:var(--accent); }
+        .status-box.success { border-left:3px solid var(--success);color:var(--success); }
+        .status-box.error { border-left:3px solid var(--error);color:var(--error); }
+        .url-list { margin-top:15px; }
+        .url-item { background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all 0.15s; }
+        .url-item:hover { border-color:var(--accent); }
+        .url-item.active { border-color:var(--success);background:rgba(34,197,94,0.1); }
+        .url-item code { font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--accent);word-break:break-all;display:block; }
+        .url-item small { color:var(--dim);font-size:0.65rem; }
+        .video-wrap { position:relative;aspect-ratio:16/9;background:#000; }
+        video { width:100%;height:100%;display:block; }
+        .overlay { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a0a12,#1a1a2e); }
+        .overlay.hidden { display:none; }
+        .overlay svg { width:60px;height:60px;fill:var(--border);margin-bottom:15px; }
+        .overlay p { color:var(--dim);font-size:0.9rem;text-align:center; }
+        .controls { padding:20px; }
+        .progress { height:6px;background:var(--bg);border-radius:3px;cursor:pointer;margin-bottom:12px; }
+        .progress:hover { height:10px; }
+        .progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;width:0%;transition:width 0.1s; }
+        .time-row { display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--dim);margin-bottom:15px; }
+        .btn-row { display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap; }
+        .btn { font-family:'JetBrains Mono',monospace;font-size:0.8rem;padding:10px 18px;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.15s; }
+        .btn svg { width:16px;height:16px;fill:currentColor; }
+        .btn-primary { background:var(--accent);color:#000; }
+        .btn-primary:hover { filter:brightness(1.1);transform:translateY(-2px); }
+        .btn-secondary { background:var(--bg);color:var(--text);border:1px solid var(--border); }
+        .btn-secondary:hover { border-color:var(--accent);color:var(--accent); }
+        .vol-wrap { display:flex;align-items:center;gap:6px;background:var(--bg);padding:6px 12px;border-radius:20px;border:1px solid var(--border); }
+        .vol-wrap svg { width:16px;height:16px;fill:var(--dim); }
+        .vol-slider { width:60px;height:4px;-webkit-appearance:none;background:var(--border);border-radius:2px; }
+        .vol-slider::-webkit-slider-thumb { -webkit-appearance:none;width:12px;height:12px;background:var(--accent);border-radius:50%;cursor:pointer; }
+        .speed-row { margin-top:12px;display:flex;justify-content:center;gap:5px; }
+        .speed-btn { padding:5px 10px;font-size:0.7rem;font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--dim);border:1px solid var(--border);border-radius:5px;cursor:pointer; }
+        .speed-btn:hover,.speed-btn.active { background:var(--accent);color:#000;border-color:var(--accent); }
+        .info-row { margin-top:15px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px; }
+        .info-box { background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center; }
+        .info-box label { font-size:0.65rem;color:var(--dim);text-transform:uppercase;display:block;margin-bottom:3px; }
+        .info-box span { font-family:'JetBrains Mono',monospace;font-size:0.9rem;color:var(--accent); }
+        .toast { position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--success);color:#000;padding:12px 24px;border-radius:8px;font-weight:600;opacity:0;transition:all 0.3s;z-index:999; }
+        .toast.show { transform:translateX(-50%) translateY(0);opacity:1; }
+        .spinner { display:inline-block;width:16px;height:16px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @media (max-width:600px) { .detect-row { flex-direction:column; } .info-row { grid-template-columns:repeat(2,1fr); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Video Stream Detector</h1>
+        
+        <div class="panel">
+            <div class="panel-head">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                Detect Stream URL
+            </div>
+            <div class="detect-section">
+                <div class="detect-row">
+                    <input type="text" class="detect-input" id="embedUrl" placeholder="Enter embed page URL..." value="https://bysezejataos.com/e/3h5ll6ep3k0t">
+                    <button class="detect-btn" id="detectBtn" onclick="detectUrl()">
+                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                        <span id="detectBtnText">Detect</span>
+                    </button>
+                </div>
+                <div class="status-box" id="statusBox">Click "Detect" to find m3u8 stream URL using headless browser.</div>
+                <div class="url-list" id="urlList"></div>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <div class="panel-head">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                Video Player
+            </div>
+            <div class="video-wrap">
+                <video id="video" playsinline></video>
+                <div class="overlay" id="overlay">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                    <p>Detect a stream URL to start playing</p>
+                </div>
+            </div>
+            <div class="controls">
+                <div class="progress" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="time-row"><span id="curTime">00:00</span><span id="durTime">00:00</span></div>
+                <div class="btn-row">
+                    <button class="btn btn-secondary" onclick="seek(-10)"><svg viewBox="0 0 24 24"><path d="M12.5 3C17.15 3 21.08 6.03 22.47 10.22L20.1 11C19.05 7.81 16.04 5.5 12.5 5.5C10.54 5.5 8.77 6.22 7.38 7.38L10 10H3V3L5.6 5.6C7.45 4 9.85 3 12.5 3z"/></svg>-10s</button>
+                    <button class="btn btn-primary" onclick="togglePlay()"><svg id="playIco" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><svg id="pauseIco" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg><span id="playTxt">Play</span></button>
+                    <button class="btn btn-secondary" onclick="seek(10)"><svg viewBox="0 0 24 24"><path d="M11.5 3C6.85 3 2.92 6.03 1.53 10.22L3.9 11C4.95 7.81 7.96 5.5 11.5 5.5C13.46 5.5 15.23 6.22 16.62 7.38L14 10H21V3L18.4 5.6C16.55 4 14.15 3 11.5 3z"/></svg>+10s</button>
+                    <div class="vol-wrap"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg><input type="range" class="vol-slider" id="volSlider" min="0" max="1" step="0.1" value="1"></div>
+                    <button class="btn btn-secondary" onclick="goFullscreen()"><svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg></button>
+                </div>
+                <div class="speed-row">
+                    <button class="speed-btn" onclick="setSpeed(0.5)">0.5x</button>
+                    <button class="speed-btn" onclick="setSpeed(0.75)">0.75x</button>
+                    <button class="speed-btn active" onclick="setSpeed(1)">1x</button>
+                    <button class="speed-btn" onclick="setSpeed(1.25)">1.25x</button>
+                    <button class="speed-btn" onclick="setSpeed(1.5)">1.5x</button>
+                    <button class="speed-btn" onclick="setSpeed(2)">2x</button>
+                </div>
+                <div class="info-row">
+                    <div class="info-box"><label>Status</label><span id="pStatus">Waiting</span></div>
+                    <div class="info-box"><label>Duration</label><span id="pDur">--:--</span></div>
+                    <div class="info-box"><label>Position</label><span id="pPos">00:00</span></div>
+                    <div class="info-box"><label>Speed</label><span id="pSpeed">1.0x</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script>
+        const video=document.getElementById('video'),overlay=document.getElementById('overlay'),progressFill=document.getElementById('progressFill'),progressBar=document.getElementById('progressBar'),statusBox=document.getElementById('statusBox'),urlList=document.getElementById('urlList'),detectBtn=document.getElementById('detectBtn'),detectBtnText=document.getElementById('detectBtnText'),toast=document.getElementById('toast');
+        let hls=null;
+        const fmt=s=>{if(isNaN(s)||s<0)return'00:00';const m=Math.floor(s/60),sec=Math.floor(s%60);return m.toString().padStart(2,'0')+':'+sec.toString().padStart(2,'0');};
+        const showToast=(msg,err=false)=>{toast.textContent=msg;toast.style.background=err?'var(--error)':'var(--success)';toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),3000);};
+        const setStatus=(msg,type)=>{statusBox.textContent=msg;statusBox.className='status-box '+type;};
+        
+        async function detectUrl(){
+            const embedUrl=document.getElementById('embedUrl').value.trim();
+            if(!embedUrl){showToast('Enter a URL',true);return;}
+            detectBtn.disabled=true;
+            detectBtnText.innerHTML='<span class="spinner"></span>';
+            setStatus('🔍 Launching headless browser...','loading');
+            urlList.innerHTML='';
+            try{
+                const res=await fetch('/api/detect?url='+encodeURIComponent(embedUrl));
+                const data=await res.json();
+                if(data.success&&data.urls.length>0){
+                    setStatus('✓ Found '+data.count+' URL(s) in '+data.elapsed+'ms','success');
+                    data.urls.forEach((item,i)=>{
+                        const div=document.createElement('div');
+                        div.className='url-item'+(i===0?' active':'');
+                        div.innerHTML='<code>'+(item.url.length>80?item.url.substring(0,80)+'...':item.url)+'</code><small>Type: '+item.type+'</small>';
+                        div.onclick=()=>{document.querySelectorAll('.url-item').forEach(el=>el.classList.remove('active'));div.classList.add('active');loadVideo(item.url);};
+                        urlList.appendChild(div);
+                    });
+                    showToast('Stream URL found!');
+                    loadVideo(data.master?data.master.url:data.urls[0].url);
+                }else{
+                    setStatus('✗ '+(data.error||'No m3u8 URLs found'),'error');
+                    showToast('No URLs found',true);
+                }
+            }catch(err){
+                setStatus('✗ Error: '+err.message,'error');
+                showToast('Detection failed',true);
+            }
+            detectBtn.disabled=false;
+            detectBtnText.textContent='Detect';
+        }
+        
+        function loadVideo(url){
+            overlay.classList.add('hidden');
+            document.getElementById('pStatus').textContent='Loading...';
+            if(hls){hls.destroy();hls=null;}
+            if(Hls.isSupported()){
+                hls=new Hls({xhrSetup:(xhr,reqUrl)=>{if(!reqUrl.startsWith('/')&&!reqUrl.startsWith(window.location.origin)){xhr.open('GET','/api/proxy?url='+encodeURIComponent(reqUrl),true);}}});
+                hls.loadSource('/api/proxy?url='+encodeURIComponent(url));
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED,()=>{document.getElementById('pStatus').textContent='Ready';video.play().catch(()=>{});});
+                hls.on(Hls.Events.ERROR,(e,d)=>{if(d.fatal)document.getElementById('pStatus').textContent='Error';});
+            }else if(video.canPlayType('application/vnd.apple.mpegurl')){video.src=url;}
+        }
+        
+        function togglePlay(){video.paused?video.play():video.pause();}
+        function seek(s){video.currentTime=Math.max(0,Math.min(video.duration||0,video.currentTime+s));}
+        function setSpeed(s){video.playbackRate=s;document.getElementById('pSpeed').textContent=s+'x';document.querySelectorAll('.speed-btn').forEach(b=>b.classList.toggle('active',b.textContent===s+'x'));}
+        function goFullscreen(){document.fullscreenElement?document.exitFullscreen():video.requestFullscreen();}
+        document.getElementById('volSlider').oninput=function(){video.volume=this.value;};
+        video.onplay=()=>{document.getElementById('playIco').style.display='none';document.getElementById('pauseIco').style.display='block';document.getElementById('playTxt').textContent='Pause';document.getElementById('pStatus').textContent='Playing';};
+        video.onpause=()=>{document.getElementById('playIco').style.display='block';document.getElementById('pauseIco').style.display='none';document.getElementById('playTxt').textContent='Play';document.getElementById('pStatus').textContent='Paused';};
+        video.ontimeupdate=()=>{const c=video.currentTime,d=video.duration;if(d){progressFill.style.width=(c/d*100)+'%';document.getElementById('curTime').textContent=fmt(c);document.getElementById('durTime').textContent=fmt(d);document.getElementById('pPos').textContent=fmt(c);document.getElementById('pDur').textContent=fmt(d);}};
+        progressBar.onclick=(e)=>{const rect=progressBar.getBoundingClientRect();if(video.duration)video.currentTime=((e.clientX-rect.left)/rect.width)*video.duration;};
+        document.onkeydown=(e)=>{if(e.target.tagName==='INPUT')return;if(e.key===' '){e.preventDefault();togglePlay();}if(e.key==='ArrowLeft'){e.preventDefault();seek(-10);}if(e.key==='ArrowRight'){e.preventDefault();seek(10);}if(e.key==='f'||e.key==='F'){e.preventDefault();goFullscreen();}};
+    </script>
+</body>
+</html>
