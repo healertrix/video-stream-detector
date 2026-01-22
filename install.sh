@@ -1,78 +1,163 @@
 #!/bin/bash
 
-# Video Stream Detector - Ubuntu Installation Script
-# Usage: curl -fsSL https://raw.githubusercontent.com/healertrix/video-stream-detector/main/install.sh | bash
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  Video Stream Detector - One-Click Ubuntu Installation Script             ║
+# ║                                                                           ║
+# ║  Usage:                                                                   ║
+# ║  curl -fsSL https://raw.githubusercontent.com/healertrix/video-stream-detector/main/install.sh | bash
+# ║                                                                           ║
+# ║  Or with sudo (if needed):                                                ║
+# ║  curl -fsSL https://raw.githubusercontent.com/healertrix/video-stream-detector/main/install.sh | sudo bash
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 
 set -e
-
-echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║   🎬 Video Stream Detector - Installation Script          ║"
-echo "╚═══════════════════════════════════════════════════════════╝"
-echo ""
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# Check if running as root
-if [ "$EUID" -eq 0 ]; then
-    echo -e "${YELLOW}Warning: Running as root. Consider running as regular user.${NC}"
-fi
+# Configuration
+REPO_URL="https://github.com/healertrix/video-stream-detector.git"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/video-stream-detector}"
+PORT="${PORT:-3333}"
 
-# Update system
-echo -e "${GREEN}[1/6] Updating system packages...${NC}"
-sudo apt update -y
+print_banner() {
+    echo -e "${CYAN}"
+    echo "╔═══════════════════════════════════════════════════════════╗"
+    echo "║   🎬 Video Stream Detector - Auto Installer               ║"
+    echo "╚═══════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
 
-# Install dependencies
-echo -e "${GREEN}[2/6] Installing system dependencies...${NC}"
-sudo apt install -y curl git
+log_step() {
+    echo -e "${GREEN}[✓]${NC} $1"
+}
 
-# Check if Node.js is installed
-if ! command -v node &> /dev/null; then
-    echo -e "${GREEN}[3/6] Installing Node.js 20...${NC}"
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt install -y nodejs
+log_info() {
+    echo -e "${BLUE}[i]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[!]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[✗]${NC} $1"
+}
+
+# Detect if we need sudo
+need_sudo() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "sudo"
+    else
+        echo ""
+    fi
+}
+
+SUDO=$(need_sudo)
+
+print_banner
+
+# Step 1: System update
+echo ""
+log_info "Step 1/6: Updating system packages..."
+$SUDO apt update -y > /dev/null 2>&1
+log_step "System updated"
+
+# Step 2: Install dependencies
+log_info "Step 2/6: Installing dependencies (curl, git)..."
+$SUDO apt install -y curl git > /dev/null 2>&1
+log_step "Dependencies installed"
+
+# Step 3: Install Node.js
+log_info "Step 3/6: Checking Node.js..."
+if command -v node &> /dev/null; then
+    NODE_VER=$(node -v)
+    NODE_MAJOR=$(echo $NODE_VER | cut -d'.' -f1 | tr -d 'v')
+    if [ "$NODE_MAJOR" -ge 18 ]; then
+        log_step "Node.js $NODE_VER already installed"
+    else
+        log_warn "Node.js $NODE_VER is too old, upgrading..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash - > /dev/null 2>&1
+        $SUDO apt install -y nodejs > /dev/null 2>&1
+        log_step "Node.js upgraded to $(node -v)"
+    fi
 else
-    NODE_VERSION=$(node -v)
-    echo -e "${GREEN}[3/6] Node.js already installed: ${NODE_VERSION}${NC}"
+    log_info "Installing Node.js 20..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash - > /dev/null 2>&1
+    $SUDO apt install -y nodejs > /dev/null 2>&1
+    log_step "Node.js $(node -v) installed"
 fi
 
-# Install Playwright system dependencies
-echo -e "${GREEN}[4/6] Installing Playwright browser dependencies...${NC}"
-sudo npx playwright install-deps chromium
+# Step 4: Install Playwright system dependencies
+log_info "Step 4/6: Installing Playwright browser dependencies..."
+$SUDO npx playwright install-deps chromium > /dev/null 2>&1
+log_step "Playwright dependencies installed"
 
-# Clone repository (if not already in the directory)
-INSTALL_DIR="$HOME/video-stream-detector"
-if [ ! -d "$INSTALL_DIR" ]; then
-    echo -e "${GREEN}[5/6] Cloning repository...${NC}"
-    git clone https://github.com/healertrix/video-stream-detector.git "$INSTALL_DIR"
+# Step 5: Clone/Update repository
+log_info "Step 5/6: Setting up project..."
+if [ -d "$INSTALL_DIR" ]; then
+    log_info "Directory exists, pulling latest changes..."
+    cd "$INSTALL_DIR"
+    git pull > /dev/null 2>&1
+    log_step "Repository updated"
 else
-    echo -e "${GREEN}[5/6] Directory exists, pulling latest...${NC}"
-    cd "$INSTALL_DIR" && git pull
+    git clone "$REPO_URL" "$INSTALL_DIR" > /dev/null 2>&1
+    cd "$INSTALL_DIR"
+    log_step "Repository cloned to $INSTALL_DIR"
 fi
 
-# Install npm dependencies
-echo -e "${GREEN}[6/6] Installing npm dependencies and Playwright...${NC}"
+# Step 6: Install npm packages and Playwright browser
+log_info "Step 6/6: Installing npm packages and Playwright Chromium..."
+npm install > /dev/null 2>&1
+npx playwright install chromium > /dev/null 2>&1
+log_step "All packages installed"
+
+# Step 7: Setup PM2 (optional but recommended)
+echo ""
+log_info "Setting up PM2 for production..."
+if ! command -v pm2 &> /dev/null; then
+    $SUDO npm install -g pm2 > /dev/null 2>&1
+    log_step "PM2 installed globally"
+else
+    log_step "PM2 already installed"
+fi
+
+# Stop existing instance if running
+pm2 delete video-detector > /dev/null 2>&1 || true
+
+# Start with PM2
 cd "$INSTALL_DIR"
-npm install
-npx playwright install chromium
+pm2 start server.js --name video-detector > /dev/null 2>&1
+pm2 save > /dev/null 2>&1
+log_step "Server started with PM2"
 
+# Setup startup script
+pm2 startup > /dev/null 2>&1 || true
+
+# Get server IP
+SERVER_IP=$(hostname -I | awk '{print $1}')
+
+# Print success message
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   ✓ Installation Complete!                                ║${NC}"
+echo -e "${GREEN}║   ✅ Installation Complete!                               ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "To start the server:"
-echo "  cd $INSTALL_DIR"
-echo "  npm start"
+echo -e "   ${CYAN}🌐 Web UI:${NC}     http://${SERVER_IP}:${PORT}"
+echo -e "   ${CYAN}🔌 API:${NC}        http://${SERVER_IP}:${PORT}/api/detect?url=<embed_url>"
+echo -e "   ${CYAN}📁 Install Dir:${NC} ${INSTALL_DIR}"
 echo ""
-echo "Or run with PM2 (recommended for production):"
-echo "  sudo npm install -g pm2"
-echo "  pm2 start server.js --name video-detector"
-echo "  pm2 save"
-echo "  pm2 startup"
+echo -e "   ${YELLOW}Commands:${NC}"
+echo -e "   • View logs:    ${BLUE}pm2 logs video-detector${NC}"
+echo -e "   • Restart:      ${BLUE}pm2 restart video-detector${NC}"
+echo -e "   • Stop:         ${BLUE}pm2 stop video-detector${NC}"
+echo -e "   • Status:       ${BLUE}pm2 status${NC}"
 echo ""
-echo "Server will be available at: http://localhost:3333"
+echo -e "   ${YELLOW}Firewall (if needed):${NC}"
+echo -e "   ${BLUE}sudo ufw allow ${PORT}/tcp${NC}"
 echo ""
